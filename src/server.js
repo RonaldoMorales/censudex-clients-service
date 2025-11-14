@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { connectDB } = require('./config/database');
 const clientRoutes = require('./routes/clientRoutes');
+const { startGrpcServer } = require('./grpc/grpcServer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,9 +33,12 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
   try {
     await connectDB();
+    
     app.listen(PORT, () => {
-      console.log(`Clients Service corriendo en puerto ${PORT}`);
+      console.log(`HTTP Server corriendo en puerto ${PORT}`);
     });
+
+    startGrpcServer();
   } catch (error) {
     console.error('Error al iniciar el servidor:', error);
     process.exit(1);
