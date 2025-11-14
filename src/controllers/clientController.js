@@ -81,21 +81,12 @@ const getAllClients = async (req, res) => {
     }
 
     const clients = await Client.findAll({
-      where: whereClause,
-      attributes: [
-        'id',
-        'firstName',
-        'lastName',
-        'email',
-        'username',
-        'isActive',
-        'birthDate',
-        'address',
-        'phone',
-        'createdAt'
-      ],
-      order: [['createdAt', 'DESC']]
-    });
+  where: whereClause,
+  attributes: {
+    exclude: ['password', 'deletedAt', 'updatedAt']
+  },
+  order: [['created_at', 'DESC']]
+});
 
     res.status(200).json({
       count: clients.length,
@@ -120,21 +111,10 @@ const getClientById = async (req, res) => {
     const { id } = req.params;
 
     const client = await Client.findByPk(id, {
-      attributes: [
-        'id',
-        'firstName',
-        'lastName',
-        'email',
-        'username',
-        'isActive',
-        'birthDate',
-        'address',
-        'phone',
-        'role',
-        'createdAt',
-        'updatedAt'
-      ]
-    });
+  attributes: {
+    exclude: ['password', 'deletedAt']
+  }
+});
 
     if (!client) {
       return res.status(404).json({ message: 'Cliente no encontrado' });
