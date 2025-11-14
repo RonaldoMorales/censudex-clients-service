@@ -109,12 +109,15 @@ const getClientById = async (req, res) => {
     }
 
     const { id } = req.params;
+    const includePassword = req.query.includePassword === 'true';
+
+    const excludeFields = includePassword ? ['deletedAt'] : ['password', 'deletedAt'];
 
     const client = await Client.findByPk(id, {
-  attributes: {
-    exclude: ['password', 'deletedAt']
-  }
-});
+      attributes: {
+        exclude: excludeFields
+      }
+    });
 
     if (!client) {
       return res.status(404).json({ message: 'Cliente no encontrado' });

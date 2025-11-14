@@ -73,7 +73,7 @@ const seedClients = async () => {
       }
     ];
 
-    await Client.bulkCreate(clients);
+    await Client.bulkCreate(clients, { individualHooks: true });
     console.log('Clientes creados exitosamente');
 
     const count = await Client.count();
