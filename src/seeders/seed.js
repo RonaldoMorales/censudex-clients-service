@@ -2,21 +2,23 @@ require('dotenv').config();
 const { sequelize } = require('../config/database');
 const Client = require('../models/Client');
 
+// Seeder para poblar la tabla clients
 const seedClients = async () => {
   try {
-    await sequelize.authenticate();
+    await sequelize.authenticate();        // Verifica conexión a la BD
     console.log('Conexion exitosa a la base de datos');
 
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ force: true }); // Reinicia tablas (DROP + CREATE)
     console.log('Base de datos sincronizada');
 
+    // Datos iniciales para la tabla clients
     const clients = [
       {
         firstName: 'Admin',
         lastName: 'Sistema',
         email: 'admin@censudex.cl',
         username: 'admin',
-        password: 'Admin123!',
+        password: 'Admin123!',            // Se hashea por individualHooks
         birthDate: '1990-01-01',
         address: 'Av. Administrador 123, Santiago',
         phone: '+56912345678',
@@ -69,20 +71,22 @@ const seedClients = async () => {
         address: 'Calle Huerfanos 456, Santiago Centro',
         phone: '+56965432109',
         role: 'client',
-        isActive: false
+        isActive: false // Cliente inactivo
       }
     ];
 
+    // Crea todos los clientes usando los hooks (para hashear contraseñas)
     await Client.bulkCreate(clients, { individualHooks: true });
     console.log('Clientes creados exitosamente');
 
+    // Verifica cuántos clientes quedaron en la BD
     const count = await Client.count();
     console.log(`Total de clientes en la base de datos: ${count}`);
 
-    process.exit(0);
+    process.exit(0); // Termina proceso correctamente
   } catch (error) {
     console.error('Error al crear clientes:', error);
-    process.exit(1);
+    process.exit(1); // Termina proceso con error
   }
 };
 

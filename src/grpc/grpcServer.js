@@ -1,11 +1,13 @@
-const grpc = require('@grpc/grpc-js');
-const protoLoader = require('@grpc/proto-loader');
+const grpc = require('@grpc/grpc-js'); // Librería gRPC
+const protoLoader = require('@grpc/proto-loader'); // Carga de .proto
 const path = require('path');
-const Client = require('../models/Client');
-const { Op } = require('sequelize');
+const Client = require('../models/Client'); // Modelo Sequelize
+const { Op } = require('sequelize'); // Operadores de comparación
 
+// Ruta del archivo .proto
 const PROTO_PATH = path.join(__dirname, '../../proto/clients.proto');
 
+// Carga del archivo .proto con configuraciones recomendadas
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
   longs: String,
@@ -14,12 +16,18 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   oneofs: true
 });
 
+// Obtiene el paquete generado
 const clientsProto = grpc.loadPackageDefinition(packageDefinition).clients;
 
+/* ============================
+   CREATE CLIENT
+============================ */
 const createClient = async (call, callback) => {
   try {
+    // Datos enviados por el cliente gRPC
     const { firstName, lastName, email, username, password, birthDate, address, phone } = call.request;
 
+    // Validación: email o username ya registrado
     const existingClient = await Client.findOne({
       where: {
         [Op.or]: [{ email }, { username }]
@@ -33,6 +41,7 @@ const createClient = async (call, callback) => {
       });
     }
 
+    // Crear cliente en BD
     const client = await Client.create({
       firstName,
       lastName,
@@ -44,6 +53,7 @@ const createClient = async (call, callback) => {
       phone
     });
 
+    // Preparar respuesta sin datos sensibles
     const clientData = client.toJSON();
     delete clientData.password;
     delete clientData.deletedAt;
@@ -63,12 +73,15 @@ const createClient = async (call, callback) => {
   }
 };
 
+/* ============================
+   GET ALL CLIENTS
+============================ */
 const getAllClients = async (call, callback) => {
   try {
     const { name, email, username, isActive } = call.request;
-    
     const whereClause = {};
 
+    // Filtro por nombre (firstName o lastName)
     if (name) {
       whereClause[Op.or] = [
         { firstName: { [Op.iLike]: `%${name}%` } },
@@ -84,10 +97,12 @@ const getAllClients = async (call, callback) => {
       whereClause.username = { [Op.iLike]: `%${username}%` };
     }
 
+    // Conversión string → boolean
     if (isActive) {
       whereClause.isActive = isActive === 'true';
     }
 
+    // Consulta con exclusión de campos sensibles
     const clients = await Client.findAll({
       where: whereClause,
       attributes: {
@@ -96,6 +111,7 @@ const getAllClients = async (call, callback) => {
       order: [['created_at', 'DESC']]
     });
 
+    // Convertir cada cliente a formato plano
     const clientsData = clients.map(c => {
       const data = c.toJSON();
       return {
@@ -118,16 +134,18 @@ const getAllClients = async (call, callback) => {
   }
 };
 
+/* ============================
+   GET CLIENT BY ID
+============================ */
 const getClientById = async (call, callback) => {
   try {
     const { id, includePassword } = call.request;
 
+    // Excluir password según bandera enviada por el cliente gRPC
     const excludeFields = includePassword ? ['deletedAt'] : ['password', 'deletedAt'];
 
     const client = await Client.findByPk(id, {
-      attributes: {
-        exclude: excludeFields
-      }
+      attributes: { exclude: excludeFields }
     });
 
     if (!client) {
@@ -154,6 +172,9 @@ const getClientById = async (call, callback) => {
   }
 };
 
+/* ============================
+   UPDATE CLIENT
+============================ */
 const updateClient = async (call, callback) => {
   try {
     const { id, firstName, lastName, email, username, birthDate, address, phone } = call.request;
@@ -167,12 +188,11 @@ const updateClient = async (call, callback) => {
       });
     }
 
+    // Validar email/username duplicados (ignorando el propio usuario)
     if (email || username) {
-      const whereClause = {
-        id: { [Op.ne]: id }
-      };
-
+      const whereClause = { id: { [Op.ne]: id } };
       const orConditions = [];
+
       if (email) orConditions.push({ email });
       if (username) orConditions.push({ username });
 
@@ -188,6 +208,7 @@ const updateClient = async (call, callback) => {
       }
     }
 
+    // Actualizar datos en BD
     await client.update({
       firstName: firstName || client.firstName,
       lastName: lastName || client.lastName,
@@ -217,6 +238,9 @@ const updateClient = async (call, callback) => {
   }
 };
 
+/* ============================
+   UPDATE PASSWORD
+============================ */
 const updatePassword = async (call, callback) => {
   try {
     const { id, password } = call.request;
@@ -230,6 +254,7 @@ const updatePassword = async (call, callback) => {
       });
     }
 
+    // Actualizar solo contraseña
     await client.update({ password });
 
     callback(null, {
@@ -244,6 +269,9 @@ const updatePassword = async (call, callback) => {
   }
 };
 
+/* ============================
+   DELETE CLIENT
+============================ */
 const deleteClient = async (call, callback) => {
   try {
     const { id } = call.request;
@@ -257,6 +285,7 @@ const deleteClient = async (call, callback) => {
       });
     }
 
+    // Soft delete + eliminación física
     await client.update({ isActive: false });
     await client.destroy();
 
@@ -272,9 +301,13 @@ const deleteClient = async (call, callback) => {
   }
 };
 
+/* ============================
+   START gRPC SERVER
+============================ */
 const startGrpcServer = () => {
-  const server = new grpc.Server();
+  const server = new grpc.Server(); // Crear servidor
 
+  // Registrar implementación del servicio
   server.addService(clientsProto.ClientService.service, {
     CreateClient: createClient,
     GetAllClients: getAllClients,
@@ -285,7 +318,8 @@ const startGrpcServer = () => {
   });
 
   const GRPC_PORT = process.env.GRPC_PORT || '50051';
-  
+
+  // Iniciar servidor gRPC
   server.bindAsync(
     `0.0.0.0:${GRPC_PORT}`,
     grpc.ServerCredentials.createInsecure(),

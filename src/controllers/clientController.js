@@ -1,9 +1,11 @@
-const { validationResult } = require('express-validator');
-const Client = require('../models/Client');
-const { Op } = require('sequelize');
+const { validationResult } = require('express-validator'); // Validación de inputs
+const Client = require('../models/Client'); // Modelo Sequelize
+const { Op } = require('sequelize'); // Operadores para consultas
 
+// Crear cliente
 const createClient = async (req, res) => {
   try {
+    // Verificar errores de validación
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -11,6 +13,7 @@ const createClient = async (req, res) => {
 
     const { firstName, lastName, email, username, password, birthDate, address, phone } = req.body;
 
+    // Validar email o username existente
     const existingClient = await Client.findOne({
       where: {
         [Op.or]: [{ email }, { username }]
@@ -23,6 +26,7 @@ const createClient = async (req, res) => {
       });
     }
 
+    // Crear cliente
     const client = await Client.create({
       firstName,
       lastName,
@@ -34,6 +38,7 @@ const createClient = async (req, res) => {
       phone
     });
 
+    // Remover contraseña de la respuesta
     const clientResponse = client.toJSON();
     delete clientResponse.password;
 
@@ -50,17 +55,19 @@ const createClient = async (req, res) => {
   }
 };
 
+// Obtener lista de clientes con filtros
 const getAllClients = async (req, res) => {
   try {
+    // Validación
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { name, email, username, isActive } = req.query;
-    
     const whereClause = {};
 
+    // Filtro por nombre (firstName o lastName)
     if (name) {
       whereClause[Op.or] = [
         { firstName: { [Op.iLike]: `%${name}%` } },
@@ -76,17 +83,19 @@ const getAllClients = async (req, res) => {
       whereClause.username = { [Op.iLike]: `%${username}%` };
     }
 
+    // Filtro booleano
     if (isActive !== undefined) {
       whereClause.isActive = isActive === 'true';
     }
 
+    // Consulta con exclusión de campos sensibles
     const clients = await Client.findAll({
-  where: whereClause,
-  attributes: {
-    exclude: ['password', 'deletedAt', 'updatedAt']
-  },
-  order: [['created_at', 'DESC']]
-});
+      where: whereClause,
+      attributes: {
+        exclude: ['password', 'deletedAt', 'updatedAt']
+      },
+      order: [['created_at', 'DESC']] // Ordenar por fecha de creación
+    });
 
     res.status(200).json({
       count: clients.length,
@@ -101,8 +110,10 @@ const getAllClients = async (req, res) => {
   }
 };
 
+// Obtener cliente por ID
 const getClientById = async (req, res) => {
   try {
+    // Validación
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -111,12 +122,11 @@ const getClientById = async (req, res) => {
     const { id } = req.params;
     const includePassword = req.query.includePassword === 'true';
 
+    // Si no se pide password, se excluye
     const excludeFields = includePassword ? ['deletedAt'] : ['password', 'deletedAt'];
 
     const client = await Client.findByPk(id, {
-      attributes: {
-        exclude: excludeFields
-      }
+      attributes: { exclude: excludeFields }
     });
 
     if (!client) {
@@ -133,8 +143,10 @@ const getClientById = async (req, res) => {
   }
 };
 
+// Actualizar cliente
 const updateClient = async (req, res) => {
   try {
+    // Validación
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -149,9 +161,10 @@ const updateClient = async (req, res) => {
       return res.status(404).json({ message: 'Cliente no encontrado' });
     }
 
+    // Validar email/username repetidos (excluyendo el propio usuario)
     if (email || username) {
       const whereClause = {
-        id: { [Op.ne]: id }
+        id: { [Op.ne]: id } // Excluir el propio
       };
 
       const orConditions = [];
@@ -169,6 +182,7 @@ const updateClient = async (req, res) => {
       }
     }
 
+    // Actualizar datos
     await client.update({
       firstName: firstName || client.firstName,
       lastName: lastName || client.lastName,
@@ -195,8 +209,10 @@ const updateClient = async (req, res) => {
   }
 };
 
+// Actualizar contraseña
 const updatePassword = async (req, res) => {
   try {
+    // Validación
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -211,6 +227,7 @@ const updatePassword = async (req, res) => {
       return res.status(404).json({ message: 'Cliente no encontrado' });
     }
 
+    // Actualizar password
     await client.update({ password });
 
     res.status(200).json({
@@ -225,8 +242,10 @@ const updatePassword = async (req, res) => {
   }
 };
 
+// Eliminar cliente (soft delete + destroy)
 const deleteClient = async (req, res) => {
   try {
+    // Validación
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -240,6 +259,7 @@ const deleteClient = async (req, res) => {
       return res.status(404).json({ message: 'Cliente no encontrado' });
     }
 
+    // Marcar como inactivo + eliminar registro
     await client.update({ isActive: false });
     await client.destroy();
 
